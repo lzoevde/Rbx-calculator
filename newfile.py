@@ -2,6 +2,23 @@ import os
 import discord
 from discord import app_commands
 from discord.ext import commands
+from flask import Flask
+from threading import Thread
+
+# ----------------- 🌐 Render 24시간 안 꺼지게 하는 웹 서버 설정 -----------------
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot is alive!"
+
+def run():
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
+# -------------------------------------------------------------------------
 
 # 봇 설정
 intents = discord.Intents.default()
@@ -259,6 +276,12 @@ async def panel(interaction: discord.Interaction):
   )
 
 
-# 🔒 보안 방식 토큰 실행 (깃허브 경고 방지)
-TOKEN = os.environ.get("DISCORD_TOKEN", "여기에_내_진짜_토큰_넣기")
-client.run(TOKEN)
+# ----------------- 🚀 실행 (웹 서버 + 봇 동시 구동) -----------------
+if __name__ == "__main__":
+  keep_alive()  # 렌더가 안 끄도록 웹 서버를 먼저 백그라운드로 실행합니다.
+
+  TOKEN = os.environ.get("DISCORD_TOKEN")
+  if TOKEN:
+    client.run(TOKEN)
+  else:
+    print("Error: DISCORD_TOKEN 환경 변수가 설정되지 않았습니다!")
