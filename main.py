@@ -58,8 +58,6 @@ class CalculatorView(discord.ui.View):
         await interaction.response.send_modal(DirectInputModal())
 
 
-# ===== 새 기능: 환율 관련 =====
-
 # 환율 설정
 @bot.tree.command(name="환율설정", description="1만원당 로벅스 값을 설정합니다.")
 async def set_rate(interaction: discord.Interaction, amount: int):
@@ -118,8 +116,6 @@ async def won_calculate(interaction: discord.Interaction, won: int):
         ephemeral=True
     )
 
-
-# ===== 기존 기능 =====
 
 @bot.event
 async def on_ready():
