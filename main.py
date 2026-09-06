@@ -1,42 +1,11 @@
 import os
-import threading
-import logging
 import discord
 from discord.ext import commands
-from flask import Flask
 
-# 로깅 설정
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# 🌐 웹 서버 (24/7 유지용)
-app = Flask(__name__)
-
-
-@app.route('/')
-def home():
-    return "Bot is alive and running!"
-
-
-def keep_alive():
-    def run():
-        log = logging.getLogger('werkzeug')
-        log.setLevel(logging.ERROR)
-        try:
-            port = int(os.environ.get('PORT', 8080))
-            app.run(host='0.0.0.0', port=port, debug=False)
-        except Exception as e:
-            logger.error(f"Flask 오류: {e}")
-
-    t = threading.Thread(target=run, daemon=True)
-    t.start()
-    logger.info("✅ Flask 웹 서버 시작")
-
-
-# 🤖 디스코드 봇 설정
+# 봇 설정
 intents = discord.Intents.default()
 intents.message_content = True
-client = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix="!", intents=intents)
 
 bot_config = {"rbx1": 1000, "rbx2": 1000}
 
@@ -65,11 +34,8 @@ class DirectInputModal(discord.ui.Modal, title="직접 입력"):
             await interaction.followup.send(
                 f"목표 {val}R -> 1번: {c1:,.0f}원 / 2번: {c2:,.0f}원", ephemeral=True
             )
-        except ValueError:
+        except:
             await interaction.followup.send("❌ 숫자를 올바르게 입력하세요!", ephemeral=True)
-        except Exception as e:
-            logger.error(f"Modal 오류: {e}")
-            await interaction.followup.send("❌ 오류 발생!", ephemeral=True)
 
 
 class CalculatorView(discord.ui.View):
@@ -78,59 +44,31 @@ class CalculatorView(discord.ui.View):
 
     @discord.ui.button(label="500 R", style=discord.ButtonStyle.secondary)
     async def b500(self, interaction: discord.Interaction, button):
-        try:
-            await interaction.response.defer(thinking=True, ephemeral=True)
-            r1, r2 = bot_config["rbx1"], bot_config["rbx2"]
-            await interaction.followup.send(
-                f"500R 필요금액 -> 1번: {(500/r1)*10000:,.0f}원 / 2번: {(500/r2)*15000:,.0f}원", 
-                ephemeral=True
-            )
-        except Exception as e:
-            logger.error(f"버튼 오류: {e}")
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        r1, r2 = bot_config["rbx1"], bot_config["rbx2"]
+        await interaction.followup.send(
+            f"500R 필요금액 -> 1번: {(500/r1)*10000:,.0f}원 / 2번: {(500/r2)*15000:,.0f}원", 
+            ephemeral=True
+        )
 
     @discord.ui.button(label="직접 입력", style=discord.ButtonStyle.success)
     async def bdir(self, interaction: discord.Interaction, button):
         await interaction.response.send_modal(DirectInputModal())
 
 
-@client.event
+@bot.event
 async def on_ready():
-    logger.info(f"✅ 로그인 완료: {client.user}")
-    try:
-        synced = await client.tree.sync()
-        logger.info(f"✅ 동기화된 명령어: {len(synced)}개")
-    except Exception as e:
-        logger.error(f"❌ 동기화 에러: {e}")
+    print(f"✅ 로그인: {bot.user}")
+    synced = await bot.tree.sync()
+    print(f"✅ 명령어 동기화: {len(synced)}개")
 
 
-@client.event
-async def on_error(event, *args, **kwargs):
-    logger.error(f"❌ 이벤트 오류 ({event}): {args}")
-
-
-@client.tree.command(name="계산패널", description="계산 패널을 띄웁니다.")
+@bot.tree.command(name="계산패널", description="계산 패널을 띄웁니다.")
 async def panel(interaction: discord.Interaction):
-    try:
-        await interaction.response.defer(ephemeral=True)
-        await interaction.followup.send(
-            embed=get_panel_embed(), view=CalculatorView()
-        )
-    except Exception as e:
-        logger.error(f"패널 오류: {e}")
+    await interaction.response.defer(ephemeral=True)
+    await interaction.followup.send(embed=get_panel_embed(), view=CalculatorView())
 
 
 if __name__ == "__main__":
-    TOKEN = os.environ.get("DISCORD_TOKEN")
-    
-    if not TOKEN:
-        logger.error("❌ DISCORD_TOKEN이 설정되지 않았습니다!")
-        exit(1)
-    
-    logger.info("🚀 봇 시작 중...")
-    keep_alive()
-    
-    try:
-        client.run(TOKEN)
-    except Exception as e:
-        logger.error(f"❌ 봇 실행 오류: {e}")
-        exit(1)
+    token = os.environ.get("DISCORD_TOKEN")
+    bot.run(token)
