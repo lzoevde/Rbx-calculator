@@ -1,5 +1,6 @@
 import os
 import threading
+import logging
 import discord
 from discord.ext import commands
 from flask import Flask
@@ -13,13 +14,15 @@ def home():
   return "Bot is alive and running!"
 
 
-def run_web():
-  app.run(host='0.0.0.0', port=8080)
-
-
 def keep_alive():
-  t = threading.Thread(target=run_web)
-  t.start()
+  def run():
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.ERROR)
+    app.run(host='0.0.0.0', port=8080)
+
+  server_thread = threading.Thread(target=run)
+  server_thread.daemon = True
+  server_thread.start()
 
 
 # ----------------- 🤖 디스코드 봇 설정 -----------------
@@ -65,7 +68,6 @@ class DirectInputModal(discord.ui.Modal, title="💰 직접 금액 입력 계산
   )
 
   async def on_submit(self, interaction: discord.Interaction):
-    # 디스코드 3초 타임아웃 방지를 위해 즉시 defer 응답
     await interaction.response.defer(thinking=True, ephemeral=True)
 
     try:
@@ -84,7 +86,6 @@ class DirectInputModal(discord.ui.Modal, title="💰 직접 금액 입력 계산
     r1 = bot_config["rbx1"]
     r2 = bot_config["rbx2"]
 
-    # 계산 로직 (예시)
     cost1 = (val / r1) * 10000
     cost2 = (val / r2) * 15000
 
@@ -118,7 +119,6 @@ class MarketSettingModal(discord.ui.Modal, title="⚙️ 실시간 거래 시세
   )
 
   async def on_submit(self, interaction: discord.Interaction):
-    # 타임아웃 방지를 위해 즉시 응답 처리
     await interaction.response.defer(thinking=True, ephemeral=True)
 
     try:
@@ -156,7 +156,6 @@ class CalculatorView(discord.ui.View):
   async def quick_calculate(
       self, interaction: discord.Interaction, target_robux: int
   ):
-    # 3초 타임아웃 방어
     await interaction.response.defer(thinking=True, ephemeral=True)
 
     r1 = bot_config["rbx1"]
@@ -239,7 +238,6 @@ async def on_ready():
 
 @client.tree.command(name="계산패널", description="로벅스 효율 계산 패널을 소환합니다.")
 async def calculator_panel(interaction: discord.Interaction):
-  # 3초 타임아웃 방어
   await interaction.response.defer(ephemeral=True)
   embed = get_panel_embed()
   view = CalculatorView()
@@ -248,10 +246,13 @@ async def calculator_panel(interaction: discord.Interaction):
 
 # ----------------- 🚀 실행 (웹 서버 + 봇 동시 구동) -----------------
 if __name__ == "__main__":
-  keep_alive()  # 렌더가 안 끄도록 웹 서버를 먼저 백그라운드로 실행합니다.
+  keep_alive()  # 백그라운드 웹 서버 구동
 
   TOKEN = os.environ.get("DISCORD_TOKEN")
   if TOKEN:
-    client.run(TOKEN)
+    try:
+      client.run(TOKEN)
+    except Exception as e:
+      print(f"봇 실행 중 에러 발생: {e}")
   else:
     print("Error: DISCORD_TOKEN 환경 변수가 설정되지 않았습니다!")
