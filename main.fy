@@ -55,7 +55,7 @@ class DirectInputModal(discord.ui.Modal, title="직접 입력"):
     r1, r2 = bot_config["rbx1"], bot_config["rbx2"]
     c1, c2 = (val / r1) * 10000, (val / r2) * 15000
     await interaction.followup.send(
-        f"목표 {val}R -> 1번: {c1:,.0f원} / 2번: {c2:,.0f}원", ephemeral=True
+        f"목표 {val}R -> 1번: {c1:,.0f}원 / 2번: {c2:,.0f}원", ephemeral=True
     )
 
 
