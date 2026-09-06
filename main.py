@@ -8,14 +8,21 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 bot_config = {"rbx1": 1000, "rbx2": 1000}
 
+# 사용자별 환율 저장
+user_rates = {}
+
+
 def get_panel_embed():
     r1 = bot_config["rbx1"]
     r2 = bot_config["rbx2"]
     return discord.Embed(
         title="💎 로벅스 효율 계산기",
-        description=f"• 1번 조건: 1만원당 {r1:,} R\n• 2번 조건: 1.5만원당 {r2:,} R",
+        description=(
+            f"• 1번 조건: 1만원당 {r1:,} R\n• 2번 조건: 1.5만원당 {r2:,} R"
+        ),
         color=discord.Color.blue(),
     )
+
 
 class DirectInputModal(discord.ui.Modal, title="직접 입력"):
     amount = discord.ui.TextInput(label="로벅스 또는 원화", placeholder="24000")
@@ -32,6 +39,7 @@ class DirectInputModal(discord.ui.Modal, title="직접 입력"):
         except:
             await interaction.followup.send("❌ 숫자를 올바르게 입력하세요!", ephemeral=True)
 
+
 class CalculatorView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -41,12 +49,77 @@ class CalculatorView(discord.ui.View):
         await interaction.response.defer(thinking=True, ephemeral=True)
         r1, r2 = bot_config["rbx1"], bot_config["rbx2"]
         await interaction.followup.send(
-            f"500R 필요금액 -> 1번: {(500/r1)*10000:,.0f}원 / 2번: {(500/r2)*15000:,.0f}원", ephemeral=True
+            f"500R 필요금액 -> 1번: {(500/r1)*10000:,.0f}원 / 2번: {(500/r2)*15000:,.0f}원", 
+            ephemeral=True
         )
 
     @discord.ui.button(label="직접 입력", style=discord.ButtonStyle.success)
     async def bdir(self, interaction: discord.Interaction, button):
         await interaction.response.send_modal(DirectInputModal())
+
+
+# ===== 새 기능: 환율 관련 =====
+
+# 환율 설정
+@bot.tree.command(name="환율설정", description="1만원당 로벅스 값을 설정합니다.")
+async def set_rate(interaction: discord.Interaction, amount: int):
+    user_id = interaction.user.id
+    user_rates[user_id] = amount
+    await interaction.response.send_message(
+        f"✅ 환율 설정 완료!\n1만원 = {amount:,}R\n(30% 수수료 적용됨)",
+        ephemeral=True
+    )
+
+
+# R → 원화 계산
+@bot.tree.command(name="R계산", description="로벅스를 원화로 변환합니다.")
+async def r_calculate(interaction: discord.Interaction, rbx: int):
+    user_id = interaction.user.id
+    
+    if user_id not in user_rates:
+        await interaction.response.send_message(
+            "❌ 먼저 `/환율설정`으로 환율을 설정하세요!\n예: `/환율설정 1300`",
+            ephemeral=True
+        )
+        return
+    
+    rate = user_rates[user_id]
+    won = (rbx / rate) * 10000
+    
+    await interaction.response.send_message(
+        f"💎 {rbx:,}R = {won:,.0f}원\n(환율: 1만원당 {rate:,}R)",
+        ephemeral=True
+    )
+
+
+# 원화 → R 계산 (30% 수수료 적용!)
+@bot.tree.command(name="원화계산", description="원화를 로벅스로 변환합니다. (30% 수수료 적용)")
+async def won_calculate(interaction: discord.Interaction, won: int):
+    user_id = interaction.user.id
+    
+    if user_id not in user_rates:
+        await interaction.response.send_message(
+            "❌ 먼저 `/환율설정`으로 환율을 설정하세요!\n예: `/환율설정 1300`",
+            ephemeral=True
+        )
+        return
+    
+    rate = user_rates[user_id]
+    rbx_before = (won / 10000) * rate
+    rbx_after = rbx_before * 0.7
+    fee = rbx_before - rbx_after
+    
+    await interaction.response.send_message(
+        f"💰 **거래 정보**\n"
+        f"고객 지불: {won:,}원\n"
+        f"제공 R: {rbx_after:,.0f}R\n"
+        f"┣ 원가: {rbx_before:,.0f}R\n"
+        f"┗ 수수료(30%): {fee:,.0f}R",
+        ephemeral=True
+    )
+
+
+# ===== 기존 기능 =====
 
 @bot.event
 async def on_ready():
@@ -54,9 +127,11 @@ async def on_ready():
     synced = await bot.tree.sync()
     print(f"✅ 명령어: {len(synced)}개")
 
+
 @bot.tree.command(name="계산패널", description="계산 패널을 띄웁니다.")
 async def panel(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     await interaction.followup.send(embed=get_panel_embed(), view=CalculatorView())
+
 
 bot.run(os.environ.get("DISCORD_TOKEN"))
